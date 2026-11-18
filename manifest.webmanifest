@@ -1,0 +1,23 @@
+{
+  "name": "World Pulse",
+  "short_name": "World Pulse",
+  "description": "What's happening around the world and in Boston & King's Lynn: news, live events map, today's holidays, sports, weather and flood warnings.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1120",
+  "theme_color": "#0f172a",
+  "categories": ["news", "weather", "sports"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Local", "url": "./#local", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Live map", "url": "./#map", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Sports", "url": "./#sports", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+  ]
+}

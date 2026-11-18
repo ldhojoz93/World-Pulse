@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="mobile-web-app-capable" content="yes">
+<title>World Pulse</title>
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#f8fafc;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0;
+  --accent:#0284c7;--accent-soft:#e0f2fe;--danger:#dc2626;--warn:#ea580c;--ok:#16a34a;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0b1120;--card:#131c2e;--text:#e2e8f0;--muted:#94a3b8;--line:#1e293b;--accent:#38bdf8;--accent-soft:#0c2a40}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:inherit;text-decoration:none}
+header{position:sticky;top:0;z-index:1000;background:var(--bg);
+  padding:calc(env(safe-area-inset-top) + 10px) 16px 8px;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px}
+header h1{font-size:19px;margin:0;flex:1;letter-spacing:-.01em}
+header h1 span{color:var(--accent)}
+#clock{font-size:12px;color:var(--muted);text-align:right}
+.iconbtn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;
+  width:38px;height:38px;font-size:18px;cursor:pointer}
+main{padding:12px 12px calc(84px + env(safe-area-inset-bottom));max-width:1400px;margin:0 auto}
+.view{display:none}.view.active{display:block}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:1000;display:flex;background:var(--card);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--muted);padding:9px 0 8px;font-size:11.5px;cursor:pointer}
+nav button b{display:block;font-size:21px;font-weight:400;margin-bottom:1px}
+nav button.active{color:var(--accent)}
+.chips{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--text);
+  border-radius:999px;padding:6px 13px;font-size:13.5px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+h2{font-size:15px;margin:14px 2px 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.grid{display:grid;gap:10px;grid-template-columns:1fr}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:block}
+.card.row{display:flex;gap:12px;align-items:flex-start}
+.card img.thumb{width:78px;height:78px;object-fit:cover;border-radius:10px;flex:none;background:var(--line)}
+.card .t{font-weight:600;margin:0 0 4px}
+.meta{font-size:12.5px;color:var(--muted)}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;
+  background:var(--accent-soft);color:var(--accent);margin-right:6px;vertical-align:1px}
+.badge.red{background:#fee2e2;color:var(--danger)}.badge.org{background:#ffedd5;color:var(--warn)}
+.badge.live{background:#dcfce7;color:var(--ok)}
+.year{font-weight:700;color:var(--accent);margin-right:6px}
+.status{color:var(--muted);text-align:center;padding:26px 10px;font-size:14px}
+.err{color:var(--danger)}
+#map{height:46vh;min-height:280px;border-radius:14px;border:1px solid var(--line);z-index:1}
+.mapwrap{display:grid;gap:12px}
+.list{max-height:none}
+.score{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
+.score .n{font-variant-numeric:tabular-nums;font-weight:700}
+.datebar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.datebar input{flex:1;border:1px solid var(--line);background:var(--card);color:var(--text);
+  border-radius:10px;padding:8px 10px;font:inherit}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin:8px 2px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+/* Unfolded Z Fold inner screen and larger */
+@media (min-width:600px){
+  .grid{grid-template-columns:1fr 1fr}
+  .mapwrap{grid-template-columns:1.25fr 1fr;align-items:start}
+  #map{height:calc(100vh - 230px);position:sticky;top:76px}
+  .mapwrap .list{max-height:calc(100vh - 230px);overflow-y:auto}
+  .mapwrap .list .grid{grid-template-columns:1fr}
+}
+@media (min-width:1000px){.grid{grid-template-columns:1fr 1fr 1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>World <span>Pulse</span></h1>
+  <div id="clock"></div>
+  <button class="iconbtn" id="refresh" aria-label="Refresh">⟳</button>
+</header>
+
+<div id="offline" style="display:none;background:#fef3c7;color:#92400e;text-align:center;font-size:13px;padding:6px">You’re offline – showing the last saved info</div>
+<main>
+  <!-- LOCAL: Boston & King's Lynn -->
+  <section class="view" id="v-local">
+    <div class="chips" id="townChips"></div>
+    <h2>Weather</h2>
+    <div id="lweather" class="grid"></div>
+    <h2>Flood warnings (Environment Agency)</h2>
+    <div id="lflood"></div>
+    <h2 id="lnewsHead">Local news</h2>
+    <div id="lnews" class="grid"></div>
+    <h2>Local football</h2>
+    <div id="lfootball" class="grid"></div>
+    <h2>What's on</h2>
+    <div id="lwhatson" class="grid"></div>
+  </section>
+
+  <!-- NEWS -->
+  <section class="view" id="v-news">
+    <div class="chips" id="regionChips"></div>
+    <div id="itn"></div>
+    <h2 id="newsHead">Latest headlines</h2>
+    <div id="news" class="grid"></div>
+  </section>
+
+  <!-- MAP -->
+  <section class="view" id="v-map">
+    <div class="chips" id="mapChips"></div>
+    <div class="mapwrap">
+      <div id="map"></div>
+      <div class="list">
+        <div class="legend">
+          <span><i class="dot" style="background:#dc2626"></i>Earthquake</span>
+          <span><i class="dot" style="background:#ea580c"></i>Wildfire</span>
+          <span><i class="dot" style="background:#7c3aed"></i>Storm</span>
+          <span><i class="dot" style="background:#b45309"></i>Volcano</span>
+          <span><i class="dot" style="background:#0284c7"></i>Other</span>
+        </div>
+        <div id="events" class="grid"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TODAY -->
+  <section class="view" id="v-today">
+    <div class="datebar">
+      <input type="date" id="day">
+      <button class="chip" id="todayBtn">Today</button>
+    </div>
+    <div class="chips" id="todayChips"></div>
+    <div id="today" class="grid"></div>
+  </section>
+
+  <!-- SPORTS -->
+  <section class="view" id="v-sports">
+    <div class="chips" id="sportChips"></div>
+    <div id="sports"></div>
+  </section>
+</main>
+
+<nav>
+  <button data-v="local"><b>📍</b>Local</button>
+  <button data-v="news"><b>📰</b>News</button>
+  <button data-v="map"><b>🌍</b>Live map</button>
+  <button data-v="today"><b>📅</b>Today</button>
+  <button data-v="sports"><b>🏟️</b>Sports & Fun</button>
+</nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const strip = html => { const d = document.createElement('div'); d.innerHTML = html || ''; return d.textContent.trim(); };
+const pad = n => String(n).padStart(2,'0');
+const store = {
+  get(k,d){ try{ const v = localStorage.getItem('wp_'+k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem('wp_'+k, JSON.stringify(v)); }catch(e){} }
+};
+function ago(t){
+  const s = (Date.now() - t)/1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60) + ' min ago';
+  if (s < 86400) return Math.floor(s/3600) + ' h ago';
+  return Math.floor(s/86400) + ' d ago';
+}
+const fmtTime = t => new Date(t).toLocaleString([], {weekday:'short', hour:'2-digit', minute:'2-digit'});
+async function getJSON(url, timeout = 15000){
+  const c = new AbortController(); const id = setTimeout(() => c.abort(), timeout);
+  try{
+    const r = await fetch(url, {signal:c.signal});
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } finally { clearTimeout(id); }
+}
+// GDELT asks for at most one request every 5 seconds, so queue them.
+let gdeltChain = Promise.resolve();
+function gdelt(url){
+  const p = gdeltChain.then(() => getJSON(url, 20000));
+  gdeltChain = p.catch(() => {}).then(() => new Promise(r => setTimeout(r, 5500)));
+  return p;
+}
+function status(el, msg, isErr){ el.innerHTML = `<div class="status ${isErr?'err':''}">${esc(msg)}</div>`; }
+function chips(el, items, current, onPick){
+  el.innerHTML = items.map(([k,label]) => `<button class="chip ${k===current?'on':''}" data-k="${esc(k)}">${esc(label)}</button>`).join('');
+  el.onclick = e => {
+    const b = e.target.closest('.chip'); if (!b) return;
+    el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b));
+    onPick(b.dataset.k);
+  };
+}
+
+/* ---------- clock ---------- */
+function tick(){
+  const n = new Date();
+  $('#clock').innerHTML = n.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) +
+    '<br>UTC ' + pad(n.getUTCHours()) + ':' + pad(n.getUTCMinutes());
+}
+tick(); setInterval(tick, 20000);
+
+/* ---------- navigation ---------- */
+const loaded = {};
+function show(v){
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'v-'+v));
+  store.set('tab', v);
+  if (!loaded[v]) { loaded[v] = true; loaders[v](); }
+  if (v === 'map' && map) setTimeout(() => map.invalidateSize(), 150);
+  window.scrollTo(0,0);
+}
+document.querySelector('nav').onclick = e => { const b = e.target.closest('button'); if (b) show(b.dataset.v); };
+$('#refresh').onclick = () => { const v = store.get('tab','local'); loaders[v](true); };
+
+/* =========================================================
+   NEWS  — Wikipedia "In the news" + GDELT live headlines
+   ========================================================= */
+const REGIONS = [
+  ['world','🌐 World'], ['uk','🇬🇧 UK'], ['europe','Europe'], ['americas','Americas'],
+  ['asia','Asia-Pacific'], ['mideast','Middle East'], ['africa','Africa'],
+  ['science','Science & Tech'], ['business','Business'], ['climate','Climate']
+];
+const GDELT_Q = {
+  world:    '(world OR international OR global OR summit OR "united nations")',
+  uk:       'sourcecountry:UK (UK OR Britain OR England OR Scotland OR Wales)',
+  europe:   '(Europe OR "European Union" OR Germany OR France OR Italy OR Spain OR Ukraine OR Poland)',
+  americas: '("United States" OR Canada OR Mexico OR Brazil OR Argentina OR Colombia OR Chile)',
+  asia:     '(China OR Japan OR India OR Korea OR Indonesia OR Australia OR Philippines OR Vietnam)',
+  mideast:  '("Middle East" OR Israel OR Iran OR Saudi OR Gaza OR Iraq OR Syria OR Turkey OR Egypt)',
+  africa:   '(Africa OR Nigeria OR Kenya OR "South Africa" OR Ethiopia OR Ghana OR Sudan)',
+  science:  '(science OR technology OR space OR NASA OR "artificial intelligence" OR research)',
+  business: '(markets OR economy OR stocks OR "central bank" OR inflation OR trade)',
+  climate:  '(climate OR weather OR flood OR heatwave OR hurricane OR typhoon OR drought)'
+};
+let region = store.get('region','world');
+chips($('#regionChips'), REGIONS, region, k => { region = k; store.set('region',k); loadNews(); });
+
+async function loadITN(){
+  const box = $('#itn');
+  const d = new Date();
+  try{
+    const j = await getJSON(`https://en.wikipedia.org/api/rest_v1/feed/featured/${d.getUTCFullYear()}/${pad(d.getUTCMonth()+1)}/${pad(d.getUTCDate())}`);
+    const items = (j.news || []).slice(0,6);
+    if (!items.length){ box.innerHTML=''; return; }
+    box.innerHTML = '<h2>Big stories right now</h2><div class="grid">' + items.map(n => {
+      const p = (n.links||[])[0] || {};
+      const url = p.content_urls?.mobile?.page || '#';
+      const img = p.thumbnail?.source;
+      return `<a class="card row" href="${esc(url)}" target="_blank" rel="noopener">
+        ${img ? `<img class="thumb" loading="lazy" src="${esc(img)}" alt="">` : ''}
+        <div><p class="t">${esc(strip(n.story))}</p><div class="meta">Wikipedia · In the news</div></div></a>`;
+    }).join('') + '</div>';
+  }catch(e){ box.innerHTML = ''; }
+}
+
+async function loadNews(){
+  const box = $('#news');
+  $('#newsHead').textContent = 'Latest headlines · ' + REGIONS.find(r => r[0]===region)[1].replace(/^\S+\s/, m => /\p{Emoji}/u.test(m) ? '' : m);
+  status(box, 'Loading headlines…');
+  const q = encodeURIComponent(GDELT_Q[region] + ' sourcelang:english');
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=60&timespan=12h&sort=datedesc&format=json`;
+  try{
+    const j = await gdelt(url);
+    const seen = new Set();
+    const arts = (j.articles || []).filter(a => {
+      const key = a.title.toLowerCase().slice(0,60);
+      if (seen.has(key)) return false; seen.add(key); return true;
+    }).slice(0,40);
+    if (!arts.length) return status(box, 'No fresh headlines for this region right now. Try another.');
+    box.innerHTML = arts.map(a => {
+      const s = a.seendate || '';
+      const t = Date.UTC(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8), +s.slice(9,11), +s.slice(11,13));
+      return `<a class="card row" href="${esc(a.url)}" target="_blank" rel="noopener">
+        ${a.socialimage ? `<img class="thumb" loading="lazy" src="${esc(a.socialimage)}" alt="" onerror="this.remove()">` : ''}
+        <div><p class="t">${esc(a.title)}</p>
+        <div class="meta">${esc(a.domain)}${a.sourcecountry ? ' · ' + esc(a.sourcecountry) : ''} · ${isNaN(t)?'':ago(t)}</div></div></a>`;
+    }).join('');
+  }catch(e){
+    status(box, 'Couldn’t reach the headline service (it limits rapid requests). Wait a few seconds and tap ⟳.', true);
+  }
+}
+
+/* =========================================================
+   LIVE MAP — USGS earthquakes + NASA EONET natural events
+   ========================================================= */
+let map, layer, allEvents = [], mapFilter = store.get('mapFilter','all');
+const COLORS = {quake:'#dc2626', wildfires:'#ea580c', severeStorms:'#7c3aed', volcanoes:'#b45309'};
+chips($('#mapChips'),
+  [['all','All'],['quake','Earthquakes'],['wildfires','Wildfires'],['severeStorms','Storms'],['volcanoes','Volcanoes'],['other','Other']],
+  mapFilter, k => { mapFilter = k; store.set('mapFilter',k); drawEvents(); });
+
+function initMap(){
+  if (map) return;
+  map = L.map('map', {worldCopyJump:true, zoomControl:true}).setView([20, 10], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 10, attribution: '© OpenStreetMap'
+  }).addTo(map);
+  layer = L.layerGroup().addTo(map);
+}
+
+async function loadMap(){
+  initMap();
+  const box = $('#events');
+  status(box, 'Loading live events…');
+  const [q, e] = await Promise.allSettled([
+    getJSON('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson'),
+    getJSON('https://eonet.gsfc.nasa.gov/api/v3/events?status=open&days=30&limit=300')
+  ]);
+  allEvents = [];
+  if (q.status === 'fulfilled'){
+    for (const f of q.value.features){
+      const [lon, lat] = f.geometry.coordinates;
+      const m = f.properties.mag;
+      allEvents.push({
+        kind:'quake', cat:'Earthquake', lat, lon, time:f.properties.time,
+        title:`M${m?.toFixed(1)} · ${f.properties.place || 'Unknown location'}`,
+        url:f.properties.url, size: Math.max(4, (m - 3) * 4),
+        extra: f.properties.tsunami ? 'Tsunami alert issued' : ''
+      });
+    }
+  }
+  if (e.status === 'fulfilled'){
+    for (const ev of e.value.events){
+      const g = ev.geometry?.[ev.geometry.length - 1]; if (!g) continue;
+      let c = g.coordinates; while (Array.isArray(c[0])) c = c[0];
+      const cat = ev.categories?.[0] || {};
+      allEvents.push({
+        kind: cat.id in COLORS ? cat.id : 'other', cat: cat.title || 'Event',
+        lat:c[1], lon:c[0], time:Date.parse(g.date), title:ev.title,
+        url: ev.sources?.[0]?.url || ev.link, size:7, extra:''
+      });
+    }
+  }
+  allEvents.sort((a,b) => b.time - a.time);
+  if (!allEvents.length) return status(box, 'Couldn’t load live events. Check your connection and tap ⟳.', true);
+  drawEvents();
+}
+
+function drawEvents(){
+  if (!layer) return;
+  layer.clearLayers();
+  const list = allEvents.filter(ev => mapFilter === 'all' || ev.kind === mapFilter);
+  for (const ev of list){
+    const col = COLORS[ev.kind] || '#0284c7';
+    L.circleMarker([ev.lat, ev.lon], {radius:ev.size, color:col, fillColor:col, fillOpacity:.55, weight:1})
+      .bindPopup(`<b>${esc(ev.title)}</b><br>${esc(ev.cat)} · ${ago(ev.time)}${ev.extra?'<br><b>'+esc(ev.extra)+'</b>':''}<br><a href="${esc(ev.url)}" target="_blank" rel="noopener">Details ›</a>`)
+      .addTo(layer);
+  }
+  const box = $('#events');
+  if (!list.length) return status(box, 'Nothing active in this category right now.');
+  box.innerHTML = list.slice(0,120).map((ev,i) => {
+    const b = ev.kind==='quake' ? 'red' : ev.kind==='wildfires' ? 'org' : '';
+    return `<div class="card" data-i="${i}" style="cursor:pointer">
+      <p class="t"><span class="badge ${b}">${esc(ev.cat)}</span>${esc(ev.title)}</p>
+      <div class="meta">${ago(ev.time)} · ${fmtTime(ev.time)}${ev.extra?' · <b>'+esc(ev.extra)+'</b>':''}</div></div>`;
+  }).join('');
+  box.onclick = e => {
+    const c = e.target.closest('.card'); if (!c) return;
+    const ev = list[+c.dataset.i];
+    map.flyTo([ev.lat, ev.lon], 5, {duration:.8});
+    if (innerWidth < 600) window.scrollTo({top:0, behavior:'smooth'});
+  };
+}
+
+/* =========================================================
+   TODAY — holidays, festivals, history (Wikipedia On This Day)
+   ========================================================= */
+let todayCat = store.get('todayCat','holidays'), todayData = null;
+chips($('#todayChips'),
+  [['holidays','🎉 Holidays & observances'],['selected','⭐ Highlights'],['events','📜 Historic events'],['births','🎂 Born today']],
+  todayCat, k => { todayCat = k; store.set('todayCat',k); drawToday(); });
+const dayInput = $('#day');
+const localISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+dayInput.value = localISO(new Date());
+dayInput.onchange = () => loadToday();
+$('#todayBtn').onclick = () => { dayInput.value = localISO(new Date()); loadToday(); };
+
+async function loadToday(){
+  const box = $('#today');
+  status(box, 'Loading…');
+  const [, m, d] = dayInput.value.split('-');
+  try{
+    todayData = await getJSON(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/all/${m}/${d}`);
+    drawToday();
+  }catch(e){ status(box, 'Couldn’t load this date. Tap ⟳ to retry.', true); }
+}
+function drawToday(){
+  const box = $('#today');
+  if (!todayData) return;
+  let items = todayData[todayCat] || [];
+  if (todayCat !== 'holidays') items = [...items].sort((a,b) => b.year - a.year);
+  if (!items.length) return status(box, 'Nothing listed for this date.');
+  box.innerHTML = items.slice(0,80).map(it => {
+    const p = (it.pages||[])[0] || {};
+    const url = p.content_urls?.mobile?.page;
+    const img = p.thumbnail?.source;
+    const tag = url ? 'a' : 'div';
+    return `<${tag} class="card row" ${url?`href="${esc(url)}" target="_blank" rel="noopener"`:''}>
+      ${img ? `<img class="thumb" loading="lazy" src="${esc(img)}" alt="">` : ''}
+      <div><p class="t">${it.year ? `<span class="year">${it.year}</span>` : ''}${esc(it.text)}</p>
+      ${p.titles?.normalized ? `<div class="meta">${esc(p.titles.normalized)}</div>` : ''}</div></${tag}>`;
+  }).join('');
+}
+
+/* =========================================================
+   SPORTS & ENTERTAINMENT — ESPN scoreboards + GDELT culture news
+   ========================================================= */
+const LEAGUES = [
+  ['soccer/eng.1','⚽ Premier League'], ['soccer/uefa.champions','⚽ Champions League'],
+  ['soccer/esp.1','⚽ La Liga'], ['soccer/ita.1','⚽ Serie A'], ['soccer/ger.1','⚽ Bundesliga'],
+  ['soccer/fifa.world','⚽ World Cup / Intl'], ['soccer/eng.2','⚽ Championship'], ['soccer/eng.5','⚽ National League'],
+  ['basketball/nba','🏀 NBA'], ['football/nfl','🏈 NFL'], ['hockey/nhl','🏒 NHL'],
+  ['baseball/mlb','⚾ MLB'], ['racing/f1','🏎️ Formula 1'], ['tennis/atp','🎾 Tennis ATP'],
+  ['fun','🎭 Concerts & culture']
+];
+let sportPick = store.get('sport','all');
+chips($('#sportChips'), [['all','All today'], ...LEAGUES], sportPick, k => { sportPick = k; store.set('sport',k); loadSports(); });
+
+function eventCard(ev, leagueLabel){
+  const comp = ev.competitions?.[0] || {};
+  const st = ev.status?.type || comp.status?.type || {};
+  const live = st.state === 'in';
+  const done = st.state === 'post';
+  const teams = (comp.competitors || []).slice(0,2);
+  const body = teams.length === 2 && teams[0].team
+    ? teams.map(c => `<div class="score"><span>${esc(c.team.displayName || c.team.name)}</span>
+        <span class="n">${st.state==='pre' ? '' : esc(c.score ?? '')}</span></div>`).join('')
+    : `<div>${esc(ev.name || ev.shortName)}</div>`;
+  return `<a class="card" href="${esc(ev.links?.[0]?.href || '#')}" target="_blank" rel="noopener">
+    <div class="meta" style="margin-bottom:6px">
+      <span class="badge ${live?'live':done?'':'org'}">${live?'LIVE':done?'FT':'UPCOMING'}</span>${esc(leagueLabel)}</div>
+    ${body}
+    <div class="meta" style="margin-top:4px">${esc(st.shortDetail || '')}${!done && !live ? ' · ' + fmtTime(ev.date) : ''}</div></a>`;
+}
+
+async function fetchLeague(path){
+  const j = await getJSON(`https://site.api.espn.com/apis/site/v2/sports/${path}/scoreboard`);
+  return j.events || [];
+}
+
+async function loadFun(box){
+  const q = encodeURIComponent('(concert OR "music festival" OR "film festival" OR premiere OR "world tour" OR exhibition OR carnival) sourcelang:english');
+  try{
+    const j = await gdelt(`https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=40&timespan=24h&sort=datedesc&format=json`);
+    const arts = j.articles || [];
+    box.innerHTML += '<h2>🎭 Concerts, festivals & culture</h2><div class="grid">' + (arts.length ? arts.map(a =>
+      `<a class="card row" href="${esc(a.url)}" target="_blank" rel="noopener">
+        ${a.socialimage ? `<img class="thumb" loading="lazy" src="${esc(a.socialimage)}" alt="" onerror="this.remove()">` : ''}
+        <div><p class="t">${esc(a.title)}</p><div class="meta">${esc(a.domain)}</div></div></a>`).join('')
+      : '<div class="status">No culture news right now.</div>') + '</div>';
+  }catch(e){
+    box.innerHTML += '<h2>🎭 Concerts, festivals & culture</h2><div class="status err">Couldn’t load. Tap ⟳ in a few seconds.</div>';
+  }
+}
+
+async function loadSports(){
+  const box = $('#sports');
+  status(box, 'Loading fixtures and scores…');
+  if (sportPick === 'fun'){ box.innerHTML = ''; return loadFun(box); }
+  const picks = sportPick === 'all' ? LEAGUES.filter(l => l[0] !== 'fun') : LEAGUES.filter(l => l[0] === sportPick);
+  const results = await Promise.allSettled(picks.map(l => fetchLeague(l[0])));
+  let html = '', total = 0;
+  results.forEach((r, i) => {
+    if (r.status !== 'fulfilled' || !r.value.length) return;
+    const evs = r.value.slice().sort((a,b) => {
+      const s = e => ({in:0, pre:1, post:2})[e.status?.type?.state] ?? 3;
+      return s(a) - s(b) || Date.parse(a.date) - Date.parse(b.date);
+    });
+    total += evs.length;
+    html += `<h2>${esc(picks[i][1])}</h2><div class="grid">${evs.map(e => eventCard(e, picks[i][1].replace(/^\S+\s/,''))).join('')}</div>`;
+  });
+  box.innerHTML = total ? html : '<div class="status">No games on the current scoreboard for this selection.</div>';
+  if (sportPick === 'all') loadFun(box);
+}
+
+/* =========================================================
+   LOCAL — Boston (Lincolnshire) & King's Lynn (Norfolk)
+   ========================================================= */
+const TOWNS = {
+  boston: {
+    name:'Boston', county:'Lincolnshire', lat:52.9789, lon:-0.0266,
+    news:'"Boston" (Lincolnshire OR Lincs OR "Boston United" OR Skegness OR Spalding)',
+    club:'Boston United',
+    links:[
+      ['Blackfriars Arts Centre','Theatre, cinema, music and comedy in Boston','https://www.blackfriarsartscentre.co.uk/'],
+      ['Visit Lincolnshire – events','Shows, markets and days out across the county','https://www.visitlincolnshire.com/whats-on/'],
+      ['Boston Borough Council','Council news, markets, bins and roadworks','https://www.boston.gov.uk/'],
+      ['Lincolnshire Live','Local news for Boston and the county','https://www.lincolnshirelive.co.uk/']
+    ]
+  },
+  lynn: {
+    name:"King's Lynn", county:'Norfolk', lat:52.7517, lon:0.3956,
+    news:'("King\'s Lynn" OR "Kings Lynn" OR "West Norfolk" OR Hunstanton OR Downham)',
+    club:"King's Lynn",
+    links:[
+      ['King\'s Lynn Corn Exchange','Concerts, comedy, panto and shows','https://www.kingslynncornexchange.co.uk/'],
+      ['Visit West Norfolk – what\'s on','Festivals, markets and events around Lynn','https://www.visitwestnorfolk.com/whats-on/'],
+      ['West Norfolk Council','Council news, roadworks and services','https://www.west-norfolk.gov.uk/'],
+      ['Lynn News','Local news for King\'s Lynn and West Norfolk','https://www.lynnnews.co.uk/']
+    ]
+  }
+};
+let town = store.get('town','both');
+chips($('#townChips'), [['both','📍 Boston + King\'s Lynn'],['boston','Boston, Lincs'],['lynn',"King's Lynn"]], town,
+  k => { town = k; store.set('town',k); loadLocal(); });
+const townList = () => town === 'both' ? [TOWNS.boston, TOWNS.lynn] : [TOWNS[town]];
+
+const WX = c => c===0?['☀️','Clear']:c<=2?['🌤️','Partly cloudy']:c===3?['☁️','Cloudy']:c<=48?['🌫️','Fog']:
+  c<=57?['🌦️','Drizzle']:c<=67?['🌧️','Rain']:c<=77?['🌨️','Snow']:c<=82?['🌧️','Showers']:c<=86?['🌨️','Snow showers']:['⛈️','Thunderstorm'];
+
+async function localWeather(){
+  const box = $('#lweather'); status(box, 'Loading weather…');
+  const res = await Promise.allSettled(townList().map(t => getJSON(
+    `https://api.open-meteo.com/v1/forecast?latitude=${t.lat}&longitude=${t.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset&wind_speed_unit=mph&timezone=Europe%2FLondon&forecast_days=4`)));
+  box.innerHTML = res.map((r,i) => {
+    const t = townList()[i];
+    if (r.status !== 'fulfilled') return `<div class="card"><p class="t">${esc(t.name)}</p><div class="meta err">Weather unavailable</div></div>`;
+    const c = r.value.current, d = r.value.daily, [ic, label] = WX(c.weather_code);
+    const days = d.time.slice(1).map((day, k) => {
+      const j = k + 1;
+      return `<div style="text-align:center;flex:1"><div class="meta">${new Date(day).toLocaleDateString([], {weekday:'short'})}</div>
+        <div style="font-size:20px">${WX(d.weather_code[j])[0]}</div>
+        <div style="font-size:13px"><b>${Math.round(d.temperature_2m_max[j])}°</b> <span class="meta">${Math.round(d.temperature_2m_min[j])}°</span></div>
+        <div class="meta">💧${d.precipitation_probability_max[j] ?? 0}%</div></div>`;
+    }).join('');
+    return `<div class="card">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="font-size:40px">${ic}</div>
+        <div style="flex:1"><p class="t" style="margin:0">${esc(t.name)}, ${esc(t.county)}</p>
+          <div class="meta">${label} · feels ${Math.round(c.apparent_temperature)}° · wind ${Math.round(c.wind_speed_10m)} mph</div>
+          <div class="meta">Sunrise ${d.sunrise[0].slice(11)} · Sunset ${d.sunset[0].slice(11)}</div></div>
+        <div style="font-size:30px;font-weight:700">${Math.round(c.temperature_2m)}°</div>
+      </div>
+      <div style="display:flex;margin-top:10px;border-top:1px solid var(--line);padding-top:8px">${days}</div></div>`;
+  }).join('');
+}
+
+async function localFloods(){
+  const box = $('#lflood'); status(box, 'Checking flood warnings…');
+  const res = await Promise.allSettled(townList().map(t =>
+    getJSON(`https://environment.data.gov.uk/flood-monitoring/id/floods?lat=${t.lat}&long=${t.lon}&dist=20`)));
+  const seen = new Set(), items = [];
+  let failed = 0;
+  res.forEach(r => {
+    if (r.status !== 'fulfilled'){ failed++; return; }
+    for (const f of r.value.items || []) if (!seen.has(f['@id'])){ seen.add(f['@id']); items.push(f); }
+  });
+  if (failed === res.length) return status(box, 'Couldn’t reach the Environment Agency. Tap ⟳ to retry.', true);
+  if (!items.length){
+    box.innerHTML = `<div class="card"><p class="t">✅ No flood warnings or alerts in force</p>
+      <div class="meta">Within 20 km of ${townList().map(t => esc(t.name)).join(' and ')}</div></div>`;
+    return;
+  }
+  items.sort((a,b) => a.severityLevel - b.severityLevel);
+  box.innerHTML = '<div class="grid">' + items.map(f => {
+    const b = f.severityLevel <= 2 ? 'red' : f.severityLevel === 3 ? 'org' : '';
+    return `<div class="card"><p class="t"><span class="badge ${b}">${esc(f.severity)}</span>${esc(f.description || f.eaAreaName)}</p>
+      <div class="meta">${f.timeRaised ? 'Raised ' + ago(Date.parse(f.timeRaised)) : ''}</div>
+      ${f.message ? `<div style="margin-top:6px;font-size:13.5px">${esc(f.message.slice(0,280))}${f.message.length>280?'…':''}</div>` : ''}</div>`;
+  }).join('') + '</div>';
+}
+
+async function localNews(){
+  const box = $('#lnews');
+  $('#lnewsHead').textContent = 'Local news · past week';
+  status(box, 'Loading local news…');
+  const arts = [], seen = new Set();
+  for (const t of townList()){
+    const q = encodeURIComponent(t.news + ' sourcecountry:UK');
+    try{
+      const j = await gdelt(`https://api.gdeltproject.org/api/v2/doc/doc?query=${q}&mode=artlist&maxrecords=30&timespan=7d&sort=datedesc&format=json`);
+      for (const a of j.articles || []){
+        const key = a.title.toLowerCase().slice(0,60);
+        if (seen.has(key)) continue; seen.add(key);
+        a._town = t.name; arts.push(a);
+      }
+    }catch(e){}
+  }
+  arts.sort((a,b) => (b.seendate||'').localeCompare(a.seendate||''));
+  if (!arts.length) return status(box, 'No local stories found right now. Try the local news links under "What\'s on".');
+  box.innerHTML = arts.slice(0,40).map(a => {
+    const s = a.seendate || '';
+    const t = Date.UTC(+s.slice(0,4), +s.slice(4,6)-1, +s.slice(6,8), +s.slice(9,11), +s.slice(11,13));
+    return `<a class="card row" href="${esc(a.url)}" target="_blank" rel="noopener">
+      ${a.socialimage ? `<img class="thumb" loading="lazy" src="${esc(a.socialimage)}" alt="" onerror="this.remove()">` : ''}
+      <div><p class="t">${esc(a.title)}</p>
+      <div class="meta"><span class="badge">${esc(a._town)}</span>${esc(a.domain)} · ${isNaN(t)?'':ago(t)}</div></div></a>`;
+  }).join('');
+}
+
+async function localFootball(){
+  const box = $('#lfootball'); status(box, 'Loading fixtures…');
+  const clubs = townList().map(t => t.club);
+  // Search the non-league scoreboards ESPN carries; local clubs only show when they have a game listed.
+  const paths = [['soccer/eng.5','National League'],['soccer/eng.6','National League North'],['soccer/eng.fa','FA Cup'],['soccer/eng.trophy','FA Trophy']];
+  const res = await Promise.allSettled(paths.map(p => fetchLeague(p[0])));
+  const cards = [];
+  res.forEach((r,i) => {
+    if (r.status !== 'fulfilled') return;
+    for (const ev of r.value){
+      const names = (ev.competitions?.[0]?.competitors || []).map(c => c.team?.displayName || '').join(' ');
+      if (clubs.some(c => names.includes(c))) cards.push(eventCard(ev, paths[i][1]));
+    }
+  });
+  const fallback = townList().map(t => t.name === 'Boston'
+    ? `<a class="card" href="https://www.bostonunited.co.uk/" target="_blank" rel="noopener"><p class="t">⚽ Boston United</p><div class="meta">Fixtures, results and tickets · bostonunited.co.uk</div></a>`
+    : `<a class="card" href="https://www.kltown.co.uk/" target="_blank" rel="noopener"><p class="t">⚽ King's Lynn Town</p><div class="meta">Fixtures, results and tickets · kltown.co.uk</div></a>`).join('');
+  box.innerHTML = cards.join('') + fallback;
+}
+
+function localWhatsOn(){
+  $('#lwhatson').innerHTML = townList().flatMap(t => t.links.map(([n, d, u]) =>
+    `<a class="card" href="${esc(u)}" target="_blank" rel="noopener"><p class="t">${esc(n)} ›</p>
+     <div class="meta"><span class="badge">${esc(t.name)}</span>${esc(d)}</div></a>`)).join('');
+}
+
+function loadLocal(){
+  localWhatsOn(); localWeather(); localFloods(); localFootball(); localNews();
+}
+
+/* ---------- boot ---------- */
+const loaders = {
+  local: loadLocal,
+  news: () => { loadITN(); loadNews(); },
+  map: loadMap,
+  today: loadToday,
+  sports: loadSports
+};
+const startTab = (location.hash || '').slice(1);
+show(['local','news','map','today','sports'].includes(startTab) ? startTab : store.get('tab','local'));
+
+// Offline notice + installable app support
+function netState(){ $('#offline').style.display = navigator.onLine ? 'none' : 'block'; }
+addEventListener('online', () => { netState(); loaders[store.get('tab','local')](); });
+addEventListener('offline', netState); netState();
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+// Auto-refresh the live map and scores every 5 minutes while open
+setInterval(() => {
+  const v = store.get('tab','local');
+  if (document.visibilityState === 'visible' && (v === 'map' || v === 'sports')) loaders[v]();
+}, 300000);
+</script>
+</body>
+</html>
